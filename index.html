@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SetMeUp - Candidate Action Planner</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 1.25rem; line-height: 1.4; }
+    h1, h2 { margin: 0 0 0.75rem; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card { border: 1px solid #8884; border-radius: 10px; padding: 1rem; background: #fff1; }
+    label { display: block; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+    textarea, input, button { width: 100%; box-sizing: border-box; padding: 0.6rem; border-radius: 8px; border: 1px solid #8886; }
+    textarea { min-height: 90px; resize: vertical; }
+    button { cursor: pointer; font-weight: 700; margin-top: 0.8rem; }
+    ul { padding-left: 1.2rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #8884; padding: 0.45rem; text-align: left; }
+    .muted { opacity: 0.8; font-size: 0.95rem; }
+    a { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>SetMeUp: Job Readiness Action Planner</h1>
+  <p class="muted">Build an actionable path toward an ideal candidate profile based on your current background and target role requirements.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Your Profile</h2>
+      <label for="work">Work experience</label>
+      <textarea id="work" placeholder="Describe your work background, responsibilities, and achievements"></textarea>
+
+      <label for="education">Education</label>
+      <textarea id="education" placeholder="Degrees, courses, certifications"></textarea>
+
+      <label for="projects">Projects</label>
+      <textarea id="projects" placeholder="Personal/open-source/professional projects and tools used"></textarea>
+
+      <label for="location">Location (for networking suggestions)</label>
+      <input id="location" placeholder="City, State/Country" />
+    </section>
+
+    <section class="card">
+      <h2>Target Role</h2>
+      <label for="jobDescription">Job description</label>
+      <textarea id="jobDescription" placeholder="Paste responsibilities, requirements, and preferred qualifications"></textarea>
+
+      <label for="jobLink">Job posting link (optional)</label>
+      <input id="jobLink" placeholder="https://..." />
+
+      <button id="generate">Generate Action Plan</button>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top: 1rem;">
+    <h2>Action Plan</h2>
+    <div id="summary" class="muted">No plan generated yet.</div>
+    <ul id="plan"></ul>
+  </section>
+
+  <section class="card" style="margin-top: 1rem;">
+    <h2>Calendar (Tentative Deadlines)</h2>
+    <table>
+      <thead>
+        <tr><th>Deadline</th><th>Action</th><th>Type</th></tr>
+      </thead>
+      <tbody id="calendarRows">
+        <tr><td colspan="3" class="muted">Generate a plan to see your timeline.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const roleSkillMap = [
+      { keyword: /react|frontend|front-end|ui/i, skill: "Frontend frameworks (React)", resource: "https://react.dev/learn" },
+      { keyword: /node|backend|api|server/i, skill: "Backend/API development (Node.js)", resource: "https://nodejs.dev/en/learn/" },
+      { keyword: /python|data|ml|ai/i, skill: "Python/data foundations", resource: "https://www.coursera.org/specializations/python" },
+      { keyword: /aws|cloud|gcp|azure/i, skill: "Cloud fundamentals", resource: "https://aws.amazon.com/training/digital/" },
+      { keyword: /sql|database|postgres|mysql/i, skill: "Databases/SQL", resource: "https://www.khanacademy.org/computing/computer-programming/sql" },
+      { keyword: /docker|kubernetes|devops|ci\/cd/i, skill: "DevOps delivery workflow", resource: "https://www.docker.com/101-tutorial/" },
+      { keyword: /lead|mentor|stakeholder|communication/i, skill: "Leadership and communication", resource: "https://www.coursera.org/learn/wharton-communication-skills" }
+    ];
+
+    function extractMissingSkills(profileText, jdText) {
+      const missing = [];
+      roleSkillMap.forEach(item => {
+        if (item.keyword.test(jdText) && !item.keyword.test(profileText)) {
+          missing.push(item);
+        }
+      });
+      return missing;
+    }
+
+    function dueDateFromNow(daysOffset) {
+      const date = new Date();
+      date.setDate(date.getDate() + daysOffset);
+      return date.toISOString().split("T")[0];
+    }
+
+    document.getElementById("generate").addEventListener("click", () => {
+      const work = document.getElementById("work").value.trim();
+      const education = document.getElementById("education").value.trim();
+      const projects = document.getElementById("projects").value.trim();
+      const location = document.getElementById("location").value.trim();
+      const jobDescription = document.getElementById("jobDescription").value.trim();
+      const jobLink = document.getElementById("jobLink").value.trim();
+
+      if (!jobDescription && !jobLink) {
+        alert("Please add a job description or a job link.");
+        return;
+      }
+
+      const profileText = `${work} ${education} ${projects}`.toLowerCase();
+      const jdText = `${jobDescription} ${jobLink}`.toLowerCase();
+      const missingSkills = extractMissingSkills(profileText, jdText);
+
+      const planItems = [];
+      planItems.push({
+        title: "Understand role requirements",
+        type: "Analysis",
+        detail: `Break down required skills from the posting and prioritize top 3 gaps.${jobLink ? ` Reference: ${jobLink}` : ""}`,
+        link: jobLink || "",
+        deadline: dueDateFromNow(2)
+      });
+
+      missingSkills.forEach((item, index) => {
+        planItems.push({
+          title: `Close gap: ${item.skill}`,
+          type: "Learning",
+          detail: `Complete a focused study sprint and build one portfolio-ready deliverable showcasing ${item.skill}.`,
+          link: item.resource,
+          deadline: dueDateFromNow(7 + index * 7)
+        });
+      });
+
+      const placeQuery = encodeURIComponent(location || "your area");
+      planItems.push({
+        title: "Attend networking events",
+        type: "Networking",
+        detail: "Attend at least 1 relevant event/workshop and connect with 3 professionals.",
+        link: `https://www.meetup.com/find/?keywords=technology&location=${placeQuery}`,
+        deadline: dueDateFromNow(10)
+      });
+
+      planItems.push({
+        title: "Run mock interview + portfolio review",
+        type: "Execution",
+        detail: "Simulate role-focused interview questions and refine your project stories.",
+        link: "https://www.pramp.com/",
+        deadline: dueDateFromNow(21)
+      });
+
+      const summary = document.getElementById("summary");
+      summary.textContent = missingSkills.length
+        ? `Detected ${missingSkills.length} likely gap(s) between your profile and target role.`
+        : "No obvious technical gap detected from keywords. Focus on networking, interview prep, and stronger project outcomes.";
+
+      const plan = document.getElementById("plan");
+      plan.innerHTML = "";
+      planItems.forEach(item => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${item.title}</strong> (${item.type}) - ${item.detail}${item.link ? ` <a href="${item.link}" target="_blank" rel="noopener noreferrer">Resource/Event</a>` : ""}`;
+        plan.appendChild(li);
+      });
+
+      const calendarRows = document.getElementById("calendarRows");
+      calendarRows.innerHTML = "";
+      planItems
+        .slice()
+        .sort((a, b) => a.deadline.localeCompare(b.deadline))
+        .forEach(item => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td>${item.deadline}</td><td>${item.title}</td><td>${item.type}</td>`;
+          calendarRows.appendChild(row);
+        });
+    });
+  </script>
+</body>
+</html>
